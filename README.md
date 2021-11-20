@@ -50,6 +50,19 @@ A long option always override the value of a short option if both are used.
   -u   | --loose      | bool      | Run in loose mode, disables the strict option
   -v   | --version    | bool      | Show the application version
 
+## NPM scripts
+
+When installed locally use following scripts.
+
+```
+...
+"scripts": {
+    "sass:render": "npx build-scss src/scss dev/css -m",
+    "sass:publish": "npx build-scss src/scss dist/css -c -m",
+}
+...
+```
+
 ## Api usage
 
 You can require the ScssBuilder class in your node script and run it, change internal options and extend it easily, look at the cli implementation and code comments to understand what to run in which order, currently there will be no extended documentation on the js api, since code comments should be sufficient to understand what works in which way.
