@@ -9,6 +9,10 @@
   "bin": {
     "build-scss": "bin/cli"
   },
+  "directories": {
+    "bin": "bin",
+    "src": "src"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/squirrel-forge/node-build-scss.git"
