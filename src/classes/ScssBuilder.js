@@ -2,7 +2,6 @@
  * Requires
  */
 const path = require( 'path' );
-const fs = require( 'fs' );
 const sass = require( 'sass' );
 const packageImporter = require( 'node-sass-package-importer' );
 const autoprefixer = require( 'autoprefixer' );
