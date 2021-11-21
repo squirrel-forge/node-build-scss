@@ -216,7 +216,7 @@ class ScssBuilder {
         let files = [ resolved ], root = resolved;
 
         // Fetch files if source is a directory
-        if ( fs.lstatSync( resolved ).isDirectory() ) {
+        if ( this.fs.isDir( resolved ) ) {
             files = this.fs.fileList( resolved, { exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ } );
 
             // Require file results
@@ -249,7 +249,7 @@ class ScssBuilder {
         }
 
         // Check for directory if not created
-        if ( !created && !fs.lstatSync( resolved ).isDirectory() ) {
+        if ( !created && !this.fs.isDir( resolved ) ) {
             throw new ScssBuilderException( 'Target must be a directory: ' + resolved );
         }
         return { target, resolved, exists, created };
