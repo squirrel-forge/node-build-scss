@@ -41,6 +41,9 @@ module.exports = async function cli() {
         // Generate sourcemaps
         map : [ '-m', '--with-map', false, true ],
 
+        // Do not run postcss
+        postcss : [ '-p', '--no-postcss', false, true ],
+
         // Do not break on any error, disables the default strict if set
         loose : [ '-u', '--loose', null, true ],
 
@@ -71,7 +74,7 @@ module.exports = async function cli() {
     scssB.verbose = options.verbose;
     scssB.options.outputStyle = options.minify ? 'compressed' : 'expanded';
     scssB.options.sourceMap = options.map;
-    scssB.postprocess = { map : options.map ? { inline : false } : false  };
+    scssB.postprocess = options.postcss ? false : { map : options.map ? { inline : false } : false  };
 
     // Notify strict mode
     if ( scssB.strict && scssB.verbose ) {
