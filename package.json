@@ -1,6 +1,6 @@
 {
   "name": "@squirrel-forge/build-scss",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Simple sass/scss wrapper including some useful configuration options.",
   "main": "src/classes/ScssBuilder.js",
   "scripts": {
@@ -17,7 +17,12 @@
     "type": "git",
     "url": "git+https://github.com/squirrel-forge/node-build-scss.git"
   },
-  "keywords": [],
+  "keywords": [
+    "simple",
+    "build",
+    "sass",
+    "postcss"
+  ],
   "author": "Daniel Hartwell <me@siux.info> (http://siux.info)",
   "license": "MIT",
   "bugs": {
@@ -31,8 +36,6 @@
     "@squirrel-forge/node-cfx": "^1.0.2",
     "@squirrel-forge/node-util": "^0.5.2",
     "autoprefixer": "^10.4.0",
-    "directory-tree": "^3.0.0",
-    "intercept-stdout": "^0.1.2",
     "node-sass-package-importer": "^5.3.2",
     "postcss": "^8.3.11",
     "sass": "^1.43.4"
