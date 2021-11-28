@@ -2,8 +2,8 @@
  * Requires
  */
 const path = require( 'path' );
-const cfx = require( '@squirrel-forge/node-cfx' ).cfx;
-const CliInput = require( '@squirrel-forge/node-util' ).CliInput;
+const { cfx } = require( '@squirrel-forge/node-cfx' );
+const { CliInput, Progress, Timer } = require( '@squirrel-forge/node-util' );
 const ScssBuilder = require( './classes/ScssBuilder' );
 
 /**
@@ -11,6 +11,9 @@ const ScssBuilder = require( './classes/ScssBuilder' );
  * @return {Promise<void>} - Possibly throws errors in strict mode
  */
 module.exports = async function cli() {
+
+    // Timer
+    const timer = new Timer();
 
     // Input
     const input = new CliInput( cfx );
@@ -105,18 +108,41 @@ module.exports = async function cli() {
         };
     }
 
-    // Run render, process and write
-    const stats = await scssB.run( source, target, statsFetcher );
+    // Init progress spinner and start count
+    const spinner = new Progress();
+
+    scssB.strict && spinner.start( 'Building... ' );
+    let stats;
+    try {
+
+        // Run render, process and write
+        stats = await scssB.run( source, target, statsFetcher );
+    } catch ( e ) {
+        scssB.strict && spinner.stop();
+
+        // Generate cleaner exception output only full trace on verbose
+        const error = new ScssBuilder.ScssBuilderException( 'Something went wrong', e );
+        scssB.error( scssB._exceptionAsOutput( error, !scssB.verbose ) );
+        process.exit( 1 );
+    }
+
+    // If we did not crash, stop spinner and inform user
+    scssB.strict && spinner.stop();
 
     // Output result info
     if ( !stats.written ) {
         cfx.warn( 'build-scss did not write any files!' );
+        if ( scssB.verbose ) {
+            cfx.info( 'Completed after [fwhite]' + timer.end( 'construct' ) );
+        }
     } else {
-        cfx.success( 'build-scss wrote ' + stats.written + ' file' + ( stats.written === 1 ? '' : 's' ) );
+        cfx.success( 'build-scss wrote ' + stats.written
+            + ' file' + ( stats.written === 1 ? '' : 's' ) + ' in ' + timer.end( 'construct' ) );
     }
 
     // Generate stats on request only
     if ( options.stats ) {
+        cfx.log( '[fmagenta][ [fwhite]Stats [fmagenta]][re]' );
         const entries = Object.entries( stats );
         for ( let i = 0; i < entries.length; i++ ) {
             const [ key, value ] = entries[ i ];

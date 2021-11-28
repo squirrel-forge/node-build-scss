@@ -6,9 +6,7 @@ const sass = require( 'sass' );
 const packageImporter = require( 'node-sass-package-importer' );
 const autoprefixer = require( 'autoprefixer' );
 const postcss = require( 'postcss' );
-const Exception = require( '@squirrel-forge/node-util' ).Exception;
-const FsInterface = require( '@squirrel-forge/node-util' ).FsInterface;
-const isPojo = require( '@squirrel-forge/node-util' ).isPojo;
+const { Exception, FsInterface, isPojo } = require( '@squirrel-forge/node-util' );
 
 /**
  * ScssBuilder exception
@@ -118,7 +116,7 @@ class ScssBuilder {
     _exceptionAsOutput( msg, noTrace = false ) {
 
         // We check if its an exception, all other errors will be sent to output unmodified
-        if ( msg instanceof Exception ) {
+        if ( msg instanceof Error ) {
             if ( this.verbose && !noTrace ) {
 
                 // In verbose we want to whole stack
