@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+ - Added progress, better runtime errors and timer.
+ - Removed packages that are installed by utils package.
+
 ## 0.5.2
  - Added *-p*, *--no-postcss* option to disable postcss processing.
 
