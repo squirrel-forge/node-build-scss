@@ -18,6 +18,7 @@
     "url": "git+https://github.com/squirrel-forge/node-build-scss.git"
   },
   "keywords": [
+    "cli",
     "simple",
     "build",
     "sass",
