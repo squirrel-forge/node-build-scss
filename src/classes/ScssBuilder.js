@@ -37,14 +37,6 @@ class ScssBuilder {
         this._cfx = cfx;
 
         /**
-         * File system interface
-         * @public
-         * @property
-         * @type {FsInterface}
-         */
-        this.fs = new FsInterface();
-
-        /**
          * Strict mode
          * @public
          * @property
@@ -204,7 +196,7 @@ class ScssBuilder {
         const resolved = path.resolve( source );
 
         // Require valid source
-        const source_exists = await this.fs.exists( resolved );
+        const source_exists = await FsInterface.exists( resolved );
         if ( !source_exists ) {
             throw new ScssBuilderException( 'Source not found: ' + resolved );
         }
@@ -213,8 +205,8 @@ class ScssBuilder {
         let files = [ resolved ], root = resolved;
 
         // Fetch files if source is a directory
-        if ( this.fs.isDir( resolved ) ) {
-            files = this.fs.fileList( resolved, { exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ } );
+        if ( FsInterface.isDir( resolved ) ) {
+            files = FsInterface.fileList( resolved, { exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ } );
 
             // Require file results
             if ( !files.length ) {
@@ -239,14 +231,14 @@ class ScssBuilder {
         const resolved = path.resolve( target );
 
         // Attempt create
-        let created = null, exists = await this.fs.exists( resolved );
+        let created = null, exists = await FsInterface.exists( resolved );
         if ( !exists ) {
-            created = await this.fs.dir( resolved );
+            created = await FsInterface.dir( resolved );
             exists = true;
         }
 
         // Check for directory if not created
-        if ( !created && !this.fs.isDir( resolved ) ) {
+        if ( !created && !FsInterface.isDir( resolved ) ) {
             throw new ScssBuilderException( 'Target must be a directory: ' + resolved );
         }
         return { target, resolved, exists, created };
@@ -279,7 +271,7 @@ class ScssBuilder {
      * @return {Object} - File data
      */
     _getFileData( file, source, target, options ) {
-        const target_path = path.join( target.resolved, this.fs.relative2root( file, source.root ) );
+        const target_path = path.join( target.resolved, FsInterface.relative2root( file, source.root ) );
         let ext = this.outputExt;
         if ( options.outputStyle === 'compressed' ) {
             ext = this.outputCompressedExt;
@@ -378,14 +370,14 @@ class ScssBuilder {
                 } else if ( file.rendered.map ) {
                     map = file.rendered.map.toString();
                 }
-                const wrote_css = await this.fs.write( file.data.target.path, css );
+                const wrote_css = await FsInterface.write( file.data.target.path, css );
                 if ( !wrote_css ) {
                     this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path ) );
                 } else {
                     stats.written++;
                 }
                 if ( map ) {
-                    const wrote_map = await this.fs.write( file.data.target.path + '.map', map );
+                    const wrote_map = await FsInterface.write( file.data.target.path + '.map', map );
                     if ( !wrote_map ) {
                         this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path + '.map' ) );
                     } else {

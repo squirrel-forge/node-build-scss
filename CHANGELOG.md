@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.0
+ - Migrate to node-util@1.0.0 package.
+
 ## 0.5.3
  - Added progress, better runtime errors and timer.
  - Removed packages that are installed by utils package.

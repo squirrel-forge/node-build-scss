@@ -3,7 +3,7 @@
  */
 const path = require( 'path' );
 const { cfx } = require( '@squirrel-forge/node-cfx' );
-const { CliInput, Progress, Timer } = require( '@squirrel-forge/node-util' );
+const { CliInput, Progress, Timer, FsInterface } = require( '@squirrel-forge/node-util' );
 const ScssBuilder = require( './classes/ScssBuilder' );
 
 /**
@@ -100,9 +100,9 @@ module.exports = async function cli() {
                 stats.files = [];
             }
             const display_source = options.verbose ? file.data.source.path
-                : builder.fs.relative2root( file.data.source.path, file.data.source_root );
+                : FsInterface.relative2root( file.data.source.path, file.data.source_root );
             const display_target = options.verbose ? file.data.target.path
-                : builder.fs.relative2root( file.data.target.path, file.data.target_root );
+                : FsInterface.relative2root( file.data.target.path, file.data.target_root );
             stats.files.push( [ display_source, display_target ] );
             return true;
         };
@@ -136,8 +136,8 @@ module.exports = async function cli() {
             cfx.info( 'Completed after [fwhite]' + timer.end( 'construct' ) );
         }
     } else {
-        cfx.success( 'build-scss wrote ' + stats.written
-            + ' file' + ( stats.written === 1 ? '' : 's' ) + ' in ' + timer.end( 'construct' ) );
+        cfx.success( 'build-scss wrote [ ' + stats.written
+            + ' ] file' + ( stats.written === 1 ? '' : 's' ) + ' in ' + timer.end( 'construct' ) );
     }
 
     // Generate stats on request only
