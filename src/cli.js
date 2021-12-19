@@ -131,7 +131,13 @@ module.exports = async function cli() {
 
     // Output result info
     if ( !stats.written ) {
-        cfx.warn( 'build-scss did not write any files!' );
+        if ( stats.sources ) {
+            cfx.warn( 'build-scss did not write any files!' );
+        } else {
+
+            // Warn user since there were no sources detected
+            cfx.error( 'build-scss did not find any files!' );
+        }
         if ( scssB.verbose ) {
             cfx.info( 'Completed after [fwhite]' + timer.end( 'construct' ) );
         }
