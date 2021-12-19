@@ -298,6 +298,7 @@ class ScssBuilder {
             source_rel : '.' + path.sep + rel,
             target_rel : path.dirname( rel ) + path.sep
                 + path.basename( target_path, path.extname( target_path ) ) + ext,
+            map : null,
             time : { total : null, rendered : null, processed : null, write : null },
             stats : { rendered : null, processed : null },
         };
@@ -339,11 +340,11 @@ class ScssBuilder {
      * Run build
      * @param {string} source - Source path
      * @param {string} target - Target path
-     * @param {null|function} callback - Before write callback
+     * @param {null|function} allowrite - Before write callback
      * @param {null|function} complete - Complete callback
      * @return {Promise<{processed: number, sources: number, rendered: number, maps: number, written: number}>} - Stats
      */
-    async run( source, target, callback = null, complete = null ) {
+    async run( source, target, allowrite = null, complete = null ) {
         this.timer.start( 'total-run' );
         source = await this._resolveSource( source );
         target = await this._resolveTarget( target );
@@ -389,8 +390,8 @@ class ScssBuilder {
             }
 
             let write = true;
-            if ( typeof callback === 'function' ) {
-                write = await callback( file, stats, this );
+            if ( typeof allowrite === 'function' ) {
+                write = await allowrite( file, stats, this );
             }
             if ( !write ) continue;
 
@@ -415,6 +416,7 @@ class ScssBuilder {
                 if ( !wrote_map ) {
                     this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path + '.map' ) );
                 } else {
+                    file.data.map = file.data.target.path + '.map';
                     stats.maps++;
                 }
             }
@@ -422,7 +424,7 @@ class ScssBuilder {
             file.data.time.total = this.timer.measure( 'total-' + fp );
 
             if ( typeof complete === 'function' ) {
-                await complete( file, stats, this );
+                await complete( file.data, stats, this );
             }
         }
         stats.time = this.timer.measure( 'total-run' );
