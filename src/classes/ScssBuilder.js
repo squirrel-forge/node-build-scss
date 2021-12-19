@@ -6,7 +6,7 @@ const sass = require( 'sass' );
 const packageImporter = require( 'node-sass-package-importer' );
 const autoprefixer = require( 'autoprefixer' );
 const postcss = require( 'postcss' );
-const { Exception, FsInterface, isPojo } = require( '@squirrel-forge/node-util' );
+const { Exception, FsInterface, isPojo, Timer } = require( '@squirrel-forge/node-util' );
 
 /**
  * ScssBuilder exception
@@ -27,6 +27,14 @@ class ScssBuilder {
      * @param {null|console} cfx - Console or alike object
      */
     constructor( cfx = null ) {
+
+        /**
+         * Timer
+         * @public
+         * @property
+         * @type {Timer}
+         */
+        this.timer = new Timer();
 
         /**
          * Console alike reporting object
@@ -180,7 +188,12 @@ class ScssBuilder {
         options.outFile = data.target.path;
 
         // Render and return
+        this.timer.start( 'render-' + data.source.path );
         const rendered = sass.renderSync( options );
+        data.time.rendered = this.timer.measure( 'render-' + data.source.path );
+        if ( rendered && rendered.stats ) {
+            data.stats.rendered = rendered.stats;
+        }
         return { data, rendered };
     }
 
@@ -271,7 +284,8 @@ class ScssBuilder {
      * @return {Object} - File data
      */
     _getFileData( file, source, target, options ) {
-        const target_path = path.join( target.resolved, FsInterface.relative2root( file, source.root ) );
+        const rel = FsInterface.relative2root( file, source.root );
+        const target_path = path.join( target.resolved, rel );
         let ext = this.outputExt;
         if ( options.outputStyle === 'compressed' ) {
             ext = this.outputCompressedExt;
@@ -281,6 +295,11 @@ class ScssBuilder {
             target_root : target.resolved,
             source : this._getPathData( file ),
             target : this._getPathData( target_path, ext ),
+            source_rel : '.' + path.sep + rel,
+            target_rel : path.dirname( rel ) + path.sep
+                + path.basename( target_path, path.extname( target_path ) ) + ext,
+            time : { total : null, rendered : null, processed : null, write : null },
+            stats : { rendered : null, processed : null },
         };
     }
 
@@ -310,7 +329,10 @@ class ScssBuilder {
         options = this._getProcessOptions( options );
         options.from = file.data.source.path;
         options.to = file.data.target.path;
+        this.timer.start( 'process-' + file.data.source.path );
         file.processed = await postcss( this.processors ).process( file.rendered.css, options );
+        file.data.time.processed = this.timer.measure( 'process-' + file.data.source.path );
+        file.data.stats.processed = file.processed.messages;
     }
 
     /**
@@ -318,10 +340,11 @@ class ScssBuilder {
      * @param {string} source - Source path
      * @param {string} target - Target path
      * @param {null|function} callback - Before write callback
+     * @param {null|function} complete - Complete callback
      * @return {Promise<{processed: number, sources: number, rendered: number, maps: number, written: number}>} - Stats
      */
-    async run( source, target, callback = null ) {
-
+    async run( source, target, callback = null, complete = null ) {
+        this.timer.start( 'total-run' );
         source = await this._resolveSource( source );
         target = await this._resolveTarget( target );
 
@@ -331,61 +354,78 @@ class ScssBuilder {
             processed : 0,
             written : 0,
             maps : 0,
+            files : [],
+            time : null,
+            dirs : {
+                created : [],
+                failed : [],
+            },
         };
 
         for ( let i = 0; i < source.files.length; i++ ) {
+            const fp = source.files[ i ];
+            this.timer.start( 'total-' + fp );
             let file = null;
             try {
-                file = this.renderFile( source.files[ i ], source, target );
+                file = this.renderFile( fp, source, target );
                 if ( file ) {
                     stats.rendered++;
                 }
             } catch ( e ) {
-                this.error( new ScssBuilderException( 'Render failed for: ' + source.files[ i ], e ) );
+                this.error( new ScssBuilderException( 'Render failed for: ' + fp, e ) );
             }
+            if ( !file ) continue;
+            stats.files.push( file.data );
 
-            if ( this.postprocess && file ) {
+            if ( this.postprocess ) {
                 try {
                     await this.processFile( file );
                     if ( file.processed ) {
                         stats.processed++;
                     }
                 } catch ( e ) {
-                    this.error( new ScssBuilderException( 'PostCSS failed for: ' + source.files[ i ], e ) );
+                    this.error( new ScssBuilderException( 'PostCSS failed for: ' + fp, e ) );
                 }
             }
 
             let write = true;
-            if ( file && typeof callback === 'function' ) {
+            if ( typeof callback === 'function' ) {
                 write = await callback( file, stats, this );
             }
+            if ( !write ) continue;
 
-            if ( write && file ) {
-                let css = file.rendered.css.toString(), map = null;
-                if ( this.postprocess && file.processed ) {
-                    css = file.processed.css.toString();
-                    if ( file.processed.map ) {
-                        map = file.processed.map.toString();
-                    }
-                } else if ( file.rendered.map ) {
-                    map = file.rendered.map.toString();
+            this.timer.start( 'write-' + fp );
+            let css = file.rendered.css.toString(), map = null;
+            if ( this.postprocess && file.processed ) {
+                css = file.processed.css.toString();
+                if ( file.processed.map ) {
+                    map = file.processed.map.toString();
                 }
-                const wrote_css = await FsInterface.write( file.data.target.path, css );
-                if ( !wrote_css ) {
-                    this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path ) );
+            } else if ( file.rendered.map ) {
+                map = file.rendered.map.toString();
+            }
+            const wrote_css = await FsInterface.write( file.data.target.path, css );
+            if ( !wrote_css ) {
+                this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path ) );
+            } else {
+                stats.written++;
+            }
+            if ( map ) {
+                const wrote_map = await FsInterface.write( file.data.target.path + '.map', map );
+                if ( !wrote_map ) {
+                    this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path + '.map' ) );
                 } else {
-                    stats.written++;
-                }
-                if ( map ) {
-                    const wrote_map = await FsInterface.write( file.data.target.path + '.map', map );
-                    if ( !wrote_map ) {
-                        this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path + '.map' ) );
-                    } else {
-                        stats.maps++;
-                    }
+                    stats.maps++;
                 }
             }
+            file.data.time.write = this.timer.measure( 'write-' + fp );
+            file.data.time.total = this.timer.measure( 'total-' + fp );
+
+            if ( typeof complete === 'function' ) {
+                await complete( file, stats, this );
+            }
         }
+        stats.time = this.timer.measure( 'total-run' );
 
         return stats;
     }
