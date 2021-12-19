@@ -1,6 +1,6 @@
 # @squirrel-forge/build-scss
 Simple sass/scss wrapper including some useful configuration options.
-Made to be compatible with node ^10.0.0, might work on higher versions, but current not supported or tested.
+Made to be compatible with node ^10.0.0, might work on higher versions, but currently not supported or tested.
 
 ## Installation
 
@@ -42,15 +42,16 @@ the source argument is omitted and assumed to be the current working directory
 
 A long option always override the value of a short option if both are used.
 
- Short | Long         | Type | Description
------- | ------------ | ---- | ---
-  -c   | --compressed | bool | OutputStyle compressed
-  -m   | --with-map   | bool | Generate sourcemaps
-  -p   | --no-postcss | bool | Disable postcss processing
-  -s   | --stats      | bool | Show stats output
-  -i   | --verbose    | bool | Show additional info
-  -u   | --loose      | bool | Run in loose mode, disables the strict option
-  -v   | --version    | bool | Show the application version
+ Short | Long         |   Type   | Description
+------ | ------------ | -------- | ---
+  -c   | --compressed |   bool   | OutputStyle compressed
+  -m   | --with-map   |   bool   | Generate sourcemaps
+  -p   | --no-postcss |   bool   | Disable postcss processing
+  -w   | --colors     | str, ... | Define verbose listing color kib limits, must be 3 integers > 0
+  -s   | --stats      |   bool   | Show stats output
+  -i   | --verbose    |   bool   | Show additional info
+  -u   | --loose      |   bool   | Run in loose mode, disables the strict option
+  -v   | --version    |   bool   | Show the application version
 
 ## NPM scripts
 
