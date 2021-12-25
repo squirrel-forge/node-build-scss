@@ -104,6 +104,14 @@ class ScssBuilder {
          * @type {Array}
          */
         this.processors = [ autoprefixer ];
+
+        /**
+         * Run sass in async
+         * @public
+         * @property
+         * @type {boolean}
+         */
+        this.async = false;
     }
 
     /**
@@ -171,6 +179,20 @@ class ScssBuilder {
     }
 
     /**
+     * Render async
+     * @protected
+     * @param {Object} options - Sass options
+     * @return {Promise<ScssBuilderException|Object>} - Sass render or exception
+     */
+    _renderAsync( options ) {
+        return new Promise( ( resolve ) => {
+            sass.render( options, ( err, result ) => {
+                resolve( err || result );
+            } );
+        } );
+    }
+
+    /**
      * Render file
      * @public
      * @param {string} file - File path
@@ -179,7 +201,7 @@ class ScssBuilder {
      * @param {null|Object} options - Sass options
      * @return {Object} - File object
      */
-    renderFile( file, source, target, options = null ) {
+    async renderFile( file, source, target, options = null ) {
         options = this._getSassOptions( options );
         const data = this._getFileData( file, source, target, options );
 
@@ -189,7 +211,15 @@ class ScssBuilder {
 
         // Render and return
         this.timer.start( 'render-' + data.source.path );
-        const rendered = sass.renderSync( options );
+        let rendered;
+        if ( this.async ) {
+            rendered = await this._renderAsync( options );
+            if ( rendered instanceof Error ) {
+                throw rendered;
+            }
+        } else {
+            rendered = sass.renderSync( options );
+        }
         data.time.rendered = this.timer.measure( 'render-' + data.source.path );
         if ( rendered && rendered.stats ) {
             data.stats.rendered = rendered.stats;
@@ -368,7 +398,7 @@ class ScssBuilder {
             this.timer.start( 'total-' + fp );
             let file = null;
             try {
-                file = this.renderFile( fp, source, target );
+                file = await this.renderFile( fp, source, target );
                 if ( file ) {
                     stats.rendered++;
                 }
