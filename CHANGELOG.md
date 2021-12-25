@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+ - Added *-x*, *--experimental* option to enable experimental functions.
+ - Added *load-base64($source,$mime:null)* experimental sass function.
+ - Added experimental sass function support.
+ - Added async sass render support to api.
+ - Updated node-cfx and node-util.
+
 ## 0.6.2
  - Added better stats display.
  - Added Timer util for detailed measurements.
