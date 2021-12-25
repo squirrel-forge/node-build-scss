@@ -48,7 +48,7 @@ A long option always override the value of a short option if both are used.
 | -c    | --compressed   | bool     | OutputStyle compressed                                          |
 | -m    | --with-map     | bool     | Generate sourcemaps                                             |
 | -p    | --no-postcss   | bool     | Disable postcss processing                                      |
-| -x    | --experimental | str, ... | Disable postcss processing                                      |
+| -x    | --experimental | str, ... | Enable experimental features                                    |
 | -w    | --colors       | str, ... | Define verbose listing color kib limits, must be 3 integers > 0 |
 | -s    | --stats        | bool     | Show stats output                                               |
 | -i    | --verbose      | bool     | Show additional info                                            |
@@ -66,6 +66,42 @@ When installed locally use following scripts.
     "sass:publish": "build-scss src/scss dist/css -c -m",
 }
 ...
+```
+
+## Experimental features
+
+Following all experimental features, these features require the sass async render, which causes a significant performance decrease as of render time, the practical impact mostly depends on the amount of sass code rendered.
+
+```
+build-scss src/scss/ dist/css -x={feature},...
+```
+
+### Load as base64 data url
+
+Feature reference: **loadBase64**
+
+Provides a sass function *load-base64($source,$mime:null)* that loads a file as data url, the mimetype is optional and will be detected at cost of performance if not set. The source argument is evaluated relative to the source root path, irrelevant from where the actual file is that contains the code, see following example:
+
+Sass code:
+```scss
+.icon {
+  &--a {
+    background-image: url(load-base64('icon.png'));
+  }
+  &--b {
+    background-image: url(load-base64('icon.jpg', 'image/jpeg'));
+  }
+}
+```
+
+Resulting css:
+```css
+.icon--a {
+    background-image: url("data:image/png;base64,...");
+}
+.icon--b {
+    background-image: url("data:image/jpeg;base64,...");
+}
 ```
 
 ## Api usage
