@@ -45,6 +45,9 @@ module.exports = async function cli() {
         // Generate sourcemaps
         map : [ '-m', '--with-map', false, true ],
 
+        // A list of experimental features to use
+        experimental : [ '-x', '--experimental', null, false ],
+
         // Do not run postcss
         postcss : [ '-p', '--no-postcss', false, true ],
 
@@ -103,6 +106,27 @@ module.exports = async function cli() {
         options.colors = [ 100 * 1024, 200 * 1024, 300 * 1024 ];
     }
     const [ mark_green, mark_yellow, mark_red ] = options.colors;
+
+    // Experimental features
+    const xuse = [];
+    if ( options.experimental ) {
+        const xavailable = [ 'loadBase64' ];
+        if ( options.experimental === 'all' ) {
+            xuse.push( ...xavailable );
+        } else {
+            const parsed = options.experimental.split( ',' ).filter( ( v ) => { return !!v.length; } );
+            if ( parsed.length ) {
+                xuse.push( ...parsed );
+            }
+        }
+        if ( xuse.length ) {
+            cfx.warn( 'Using experimental features:' );
+        }
+        for ( let i = 0; i < xuse.length; i++ ) {
+            cfx.info( ' - ' + xuse[ i ] );
+            scssB.useExperimental( xuse[ i ] );
+        }
+    }
 
     // Notify strict mode
     if ( scssB.strict && scssB.verbose ) {
