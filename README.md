@@ -35,23 +35,25 @@ the source argument is omitted and assumed to be the current working directory
 
 #### Using two arguments
 
-1. source - Path from where to read, if a directory, files are fetched with following options: ```{ exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ }```
+1. source - Path from where to read, if a directory, files are fetched with following options:
+            ```{ exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ }```
 2. target - Path to write rendered and processed css files
 
 ### Options
 
 A long option always override the value of a short option if both are used.
 
- Short | Long         |   Type   | Description
------- | ------------ | -------- | ---
-  -c   | --compressed |   bool   | OutputStyle compressed
-  -m   | --with-map   |   bool   | Generate sourcemaps
-  -p   | --no-postcss |   bool   | Disable postcss processing
-  -w   | --colors     | str, ... | Define verbose listing color kib limits, must be 3 integers > 0
-  -s   | --stats      |   bool   | Show stats output
-  -i   | --verbose    |   bool   | Show additional info
-  -u   | --loose      |   bool   | Run in loose mode, disables the strict option
-  -v   | --version    |   bool   | Show the application version
+| Short | Long           | Type     | Description                                                     |
+|-------|----------------|----------|-----------------------------------------------------------------|
+| -c    | --compressed   | bool     | OutputStyle compressed                                          |
+| -m    | --with-map     | bool     | Generate sourcemaps                                             |
+| -p    | --no-postcss   | bool     | Disable postcss processing                                      |
+| -x    | --experimental | str, ... | Disable postcss processing                                      |
+| -w    | --colors       | str, ... | Define verbose listing color kib limits, must be 3 integers > 0 |
+| -s    | --stats        | bool     | Show stats output                                               |
+| -i    | --verbose      | bool     | Show additional info                                            |
+| -u    | --loose        | bool     | Run in loose mode, disables the strict option                   |
+| -v    | --version      | bool     | Show the application version                                    |
 
 ## NPM scripts
 
@@ -60,8 +62,8 @@ When installed locally use following scripts.
 ```
 ...
 "scripts": {
-    "sass:render": "npx build-scss src/scss dev/css -m",
-    "sass:publish": "npx build-scss src/scss dist/css -c -m",
+    "sass:render": "build-scss src/scss dev/css -m",
+    "sass:publish": "build-scss src/scss dist/css -c -m",
 }
 ...
 ```
