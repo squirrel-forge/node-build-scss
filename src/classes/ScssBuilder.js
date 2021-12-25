@@ -86,7 +86,8 @@ class ScssBuilder {
         this.options = {
             outputStyle : 'compressed',
             sourceMap : true,
-            importer : [ packageImporter() ]
+            importer : [ packageImporter() ],
+            functions : {},
         };
 
         /**
@@ -112,6 +113,20 @@ class ScssBuilder {
          * @type {boolean}
          */
         this.async = false;
+
+        /**
+         * Current/last run data
+         * @type {null|Object}
+         */
+        this.last = null;
+
+        /**
+         * Builtin experimental names used
+         * @protected
+         * @property
+         * @type {string[]}
+         */
+        this._x = [];
     }
 
     /**
@@ -160,6 +175,54 @@ class ScssBuilder {
         if ( this._cfx && typeof this._cfx.error === 'function' ) {
             this._cfx.error( this._exceptionAsOutput( msg ) );
         }
+    }
+
+    /**
+     * Use experimental by name
+     * @public
+     * @param {string} name - Name or module to use
+     * @return {void}
+     */
+    useExperimental( name ) {
+        if ( this._x.includes( name ) ) {
+            throw new ScssBuilderException( 'Experimental feature already in use: ' + name );
+        }
+        const builtins = [ 'loadBase64' ];
+        if ( builtins.includes( name ) ) {
+            name = '../sass-functions/' + name;
+        }
+        let factory = null;
+        try {
+            factory = require( name );
+        } catch ( e ) {
+            throw new ScssBuilderException( 'Experimental factory not found: ' + name, e );
+        }
+        if ( typeof factory !== 'function' ) {
+            throw new ScssBuilderException( 'Experimental factory must be a function: ' + name );
+        }
+        try {
+            factory( sass, this );
+        } catch ( e ) {
+            throw new ScssBuilderException( 'Failed to run experimental factory for: ' + name, e );
+        }
+        this._x.push( name );
+    }
+
+    /**
+     * Register experimental sass function
+     * @public
+     * @param {string} sig - Signature
+     * @param {Function} fn - Function handler
+     * @return {void}
+     */
+    registerExperimental( sig, fn ) {
+        if ( typeof sig !== 'string' ) {
+            throw new ScssBuilderException( 'Invalid function signature' );
+        }
+        if ( typeof fn !== 'function' ) {
+            throw new ScssBuilderException( 'Invalid experimental function' );
+        }
+        this.options.functions[ sig ] = fn;
     }
 
     /**
@@ -378,6 +441,7 @@ class ScssBuilder {
         this.timer.start( 'total-run' );
         source = await this._resolveSource( source );
         target = await this._resolveTarget( target );
+        this.last = { source, target };
 
         const stats = {
             sources : source.files.length,
