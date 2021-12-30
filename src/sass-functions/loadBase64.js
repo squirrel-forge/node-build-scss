@@ -3,7 +3,7 @@
  */
 const path = require( 'path' );
 const fileType = require( 'file-type' );
-const { Exception, FsInterface } = require( '@squirrel-forge/node-util' );
+const { Exception, FsInterface, strSlug } = require( '@squirrel-forge/node-util' );
 
 /**
  * ScssBuilder exception
@@ -14,12 +14,11 @@ class ScssLoadBase64Exception extends Exception {}
 /**
  * Get from cache
  * @param {string} source - Source
- * @param {null|string} mime - Mime
  * @param {ScssBuilder} builder - Builder instane
  * @return {null|string} - Cached string if available
  */
-function fromCache( source, mime, builder ) {
-    const key = source + ( mime ? ':' + mime : '' );
+function fromCache( source, builder ) {
+    const key = strSlug( source );
     if ( builder._b64c[ key ] ) {
         return builder._b64c[ key ];
     }
@@ -29,13 +28,12 @@ function fromCache( source, mime, builder ) {
 /**
  * Write to cache
  * @param {string} source - Source
- * @param {null|string} mime - Mime
  * @param {string} value - Value to cache
  * @param {ScssBuilder} builder - Builder instane
  * @return {void}
  */
-function toCache( source, mime, value, builder ) {
-    const key = source + ( mime ? ':' + mime : '' );
+function toCache( source, value, builder ) {
+    const key = strSlug( source );
     builder._b64c[ key ] = value;
 }
 
@@ -50,8 +48,7 @@ function toCache( source, mime, value, builder ) {
 async function base64Local( source, mime, sass, builder ) {
 
     // Check cache
-    const imime = mime;
-    const cached = fromCache( source, imime, builder );
+    const cached = fromCache( source, builder );
     if ( cached ) {
         return new sass.types.String( cached );
     }
@@ -77,7 +74,7 @@ async function base64Local( source, mime, sass, builder ) {
     // Load file
     const buf = await FsInterface.read( file_path, 'base64' );
     const output = `"data:${mime};base64,${buf.toString()}"`;
-    toCache( source, imime, output, builder );
+    toCache( source, output, builder );
     return new sass.types.String( output );
 }
 
