@@ -17,7 +17,6 @@ class ScssBuilderException extends Exception {}
 /**
  * ScssBuilder class
  * @class
- * @type {ScssBuilder}
  */
 class ScssBuilder {
 

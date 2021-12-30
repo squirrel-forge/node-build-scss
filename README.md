@@ -13,8 +13,8 @@ npm i @squirrel-forge/build-scss
 
 If you installed globally with the *-g* option.
 ```
-build-scss target -b --boolean
-build-scss source target -b --boolean
+build-scss target -b --boolean --str=loadBase64,...
+build-scss source target -b --boolean --str=loadBase64,...
 
 ```
 
