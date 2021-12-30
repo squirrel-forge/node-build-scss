@@ -4,7 +4,7 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
 const { cfx } = require( '@squirrel-forge/node-cfx' );
-const { CliInput, Progress, Timer, leadingZeros, StatsDisplay, convertBytes, FsInterface } = require( '@squirrel-forge/node-util' );
+const { CliInput, Progress, Timer, leadingZeros, StatsDisplay, convertBytes } = require( '@squirrel-forge/node-util' );
 const ScssBuilder = require( './classes/ScssBuilder' );
 
 /**
@@ -235,6 +235,9 @@ module.exports = async function cli() {
 
     // Begin processing
     scssB.strict && spinner.start( 'Building... ' );
+    if ( scssB.verbose ) {
+        cfx.info( 'Reading from: ' + stDi.show( [ path.resolve( source ), 'path' ], true ) );
+    }
     let stats;
     try {
 
@@ -265,6 +268,11 @@ module.exports = async function cli() {
             cfx.info( 'Completed after [fwhite]' + timer.end( 'construct' ) );
         }
     } else {
+        if ( scssB.verbose ) {
+            cfx.info( 'Wrote to: ' + stDi.show( [ path.resolve( target ), 'path' ], true ) );
+        }
+
+        // Show a few details at least when something was written
         cfx.success( 'build-scss wrote [ ' + stats.written
             + ' ] file' + ( stats.written === 1 ? '' : 's' ) + ' in ' + timer.end( 'construct' ) );
     }
