@@ -107,6 +107,20 @@ module.exports = async function cli() {
     }
     const [ mark_green, mark_yellow, mark_red ] = options.colors;
 
+    // Get experimental as boolean flag if empty
+    if ( !options.experimental ) {
+        const expo = input.getFlagsOptions( {
+
+            // A list of experimental features to use
+            experimental : [ '-x', '--experimental', false, true ],
+        } );
+
+        // Enable all if set as boolean flag
+        if ( expo.experimental ) {
+            options.experimental = 'all';
+        }
+    }
+
     // Experimental features
     const xuse = [];
     if ( options.experimental ) {
@@ -234,10 +248,10 @@ module.exports = async function cli() {
     };
 
     // Begin processing
-    scssB.strict && spinner.start( 'Building... ' );
     if ( scssB.verbose ) {
         cfx.info( 'Reading from: ' + stDi.show( [ path.resolve( source ), 'path' ], true ) );
     }
+    scssB.strict && spinner.start( 'Building... ' );
     let stats;
     try {
 
@@ -285,6 +299,10 @@ module.exports = async function cli() {
                 Time : [ stats.time, 'time' ],
             },
         };
+        if ( !scssB.verbose ) {
+            so.Overview.Source = [ path.resolve( source ), 'path' ];
+            so.Overview.Target = [ path.resolve( target ), 'path' ];
+        }
         if ( stats.sources !== stats.rendered ) {
             so.Overview.Files[ 0 ].push( 'Rendered:' );
             so.Overview.Files[ 0 ].push( stats.rendered );
