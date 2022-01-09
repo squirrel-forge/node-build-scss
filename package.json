@@ -1,6 +1,6 @@
 {
   "name": "@squirrel-forge/build-scss",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Simple sass/scss wrapper including some useful configuration options.",
   "main": "src/classes/ScssBuilder.js",
   "scripts": {
