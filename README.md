@@ -43,17 +43,23 @@ the source argument is omitted and assumed to be the current working directory
 
 A long option always override the value of a short option if both are used.
 
-| Short | Long           | Type     | Description                                                     |
-|-------|----------------|----------|-----------------------------------------------------------------|
-| -c    | --compressed   | bool     | OutputStyle compressed                                          |
-| -m    | --with-map     | bool     | Generate sourcemaps                                             |
-| -p    | --no-postcss   | bool     | Disable postcss processing                                      |
-| -x    | --experimental | str, ... | Enable experimental features                                    |
-| -w    | --colors       | str, ... | Define verbose listing color kib limits, must be 3 integers > 0 |
-| -s    | --stats        | bool     | Show stats output                                               |
-| -i    | --verbose      | bool     | Show additional info                                            |
-| -u    | --loose        | bool     | Run in loose mode, disables the strict option                   |
-| -v    | --version      | bool     | Show the application version                                    |
+| Short | Long           | Type            | Description                                                                                                                                |
+|-------|----------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| -c    | --compressed   | bool            | OutputStyle compressed                                                                                                                     |
+| -m    | --with-map     | bool            | Generate sourcemaps                                                                                                                        |
+| -p    | --no-postcss   | bool            | Disable postcss processing, the autoprefixer plugin won't run                                                                              |
+| -x    | --experimental | bool / str, ... | Enable experimental features, use without value or 'all' to enable all features, use comma separated list to enable specific features only |
+| -w    | --colors       | str, ...        | Define verbose listing color kib limits, must be 3 integers > 0, default: 102400,204800,307200                                             |
+| -s    | --stats        | bool            | Show stats output                                                                                                                          |
+| -i    | --verbose      | bool            | Show additional info, useful during development                                                                                            |
+| -u    | --loose        | bool            | Run in loose mode, disables the strict option and provides cleaner output when using @debug in your sass                                   |
+| -v    | --version      | bool            | Show the application version                                                                                                               |
+
+For development it's recommended to use following command options:
+```
+build-scss src dist -s -i -u -x
+```
+And no, this was not designed this way on purpose.
 
 ## NPM scripts
 
@@ -73,7 +79,7 @@ When installed locally use following scripts.
 Following all experimental features, these features require the sass async render, which causes a significant performance decrease as of render time, the practical impact mostly depends on the amount of sass code rendered.
 
 ```
-build-scss src/scss/ dist/css -x={feature},...
+build-scss src/scss/ dist/css -x={all|feature},...
 ```
 
 ### Load as base64 data url
