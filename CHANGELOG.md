@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2
+ - Added experimental as boolean option to use all experimentals.
+ - Improved *load-base64* runtime cache.
+ - Added source and target paths to stats if not displayed with verbose.
+ - Fixed process spinner start collision with verbose output.
+
 ## 0.7.0
  - Added *-x*, *--experimental* option to enable experimental functions.
  - Added *load-base64($source,$mime:null)* experimental sass function.
