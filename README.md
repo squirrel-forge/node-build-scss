@@ -45,11 +45,14 @@ A long option always override the value of a short option if both are used.
 
 | Short | Long           | Type            | Description                                                                                                                                |
 |-------|----------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| -p    | --production   | bool            | Set env to production and minify                                                                                                           |
+| -d    | --development  | bool            | Set env to development and generate map                                                                                                    |
+| -e    | --env          | str             | Set custom env name                                                                                                                        |
 | -c    | --compressed   | bool            | OutputStyle compressed                                                                                                                     |
 | -m    | --with-map     | bool            | Generate sourcemaps                                                                                                                        |
-| -p    | --no-postcss   | bool            | Disable postcss processing, the autoprefixer plugin won't run                                                                              |
+|       | --no-postcss   | bool            | Disable postcss processing, the autoprefixer plugin won't run                                                                              |
 | -x    | --experimental | bool / str, ... | Enable experimental features, use without value or 'all' to enable all features, use comma separated list to enable specific features only |
-| -w    | --colors       | str, ...        | Define verbose listing color kib limits, must be 3 integers > 0, default: 102400,204800,307200                                             |
+|       | --colors       | int, ...        | Define verbose listing color kib limits, must be 3 integers > 0, default: 102400,204800,307200                                             |
 | -s    | --stats        | bool            | Show stats output                                                                                                                          |
 | -i    | --verbose      | bool            | Show additional info, useful during development                                                                                            |
 | -u    | --loose        | bool            | Run in loose mode, disables the strict option and provides cleaner output when using @debug in your sass                                   |
