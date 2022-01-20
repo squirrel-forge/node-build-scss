@@ -46,7 +46,7 @@ module.exports = async function cli() {
         map : [ '-m', '--with-map', false, true ],
 
         // A list of experimental features to use
-        experimental : [ '-x', '--experimental', null, false ],
+        experimental : [ '-x', '--experimental', null, true, true ],
 
         // Do not run postcss
         postcss : [ '-p', '--no-postcss', false, true ],
@@ -107,23 +107,14 @@ module.exports = async function cli() {
     }
     const [ mark_green, mark_yellow, mark_red ] = options.colors;
 
-    // Get experimental as boolean flag if empty
-    if ( !options.experimental ) {
-        const expo = input.getFlagsOptions( {
-
-            // A list of experimental features to use
-            experimental : [ '-x', '--experimental', false, true ],
-        } );
-
-        // Enable all if set as boolean flag
-        if ( expo.experimental ) {
-            options.experimental = 'all';
-        }
-    }
-
     // Experimental features
     const xuse = [];
     if ( options.experimental ) {
+
+        // Enable all if set as boolean flag
+        if ( options.experimental === true ) {
+            options.experimental = 'all';
+        }
         const xavailable = [ 'loadBase64' ];
         if ( options.experimental === 'all' ) {
             xuse.push( ...xavailable );
