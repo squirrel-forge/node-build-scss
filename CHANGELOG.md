@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.3
+ - Update *node-util* package.
+ - Internal updates and cleanups for *--experimental* option.
+ - Removed short option *-w* for *--colors* option, to free it for future use.
+
 ## 0.7.2
  - Added experimental as boolean option to use all experimentals.
  - Improved *load-base64* runtime cache.
