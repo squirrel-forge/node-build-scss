@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.0
+ - Migrated to the new node api, including internal refactoring, which only affects the internal js api and makes it more verbose and easier to use.
+ - Updated all dependencies including plugins, plugin peer dependencies must be installed manually.
+ - Updated and improved plugin loading, including easy custom plugins with options support.
+ - Added plugins configs options map and loading.
+ - Added *@squirrel-forge/sass-base64-loader* sass function plugin for file content loading.
+ - Removed *node-sass-package-importer* package in favor of *@squirrel-forge/sass-package-importer* for the new api.
+ - Support *.sass* file extension for recursive directory loading.
+ - Added custom environment injection var *$scss-env* that contains the environment name and *$scss-production* that contains a boolean.
+ - Added *-e* and *--env* option set a custom env name.
+ - Added *-p* and *--production* as shortcut for *--env=production* and *--compressed* option.
+ - Added *-d* and *--development* as shortcut for *--env=development* and *--with-map* option.
+ - Added *-o* and *--options* option to set options source directory.
+ - Added *--defaults* option to deploy plugins defaults options config.
+
 ## 0.7.3
  - Update *node-util* package.
  - Internal updates and cleanups for *--experimental* option.
