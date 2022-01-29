@@ -1,21 +1,19 @@
 # @squirrel-forge/build-scss
-Simple sass/scss wrapper including some useful configuration options.
+Simple sass wrapper including some useful configuration options and extended features like package support and loading files as base64 encoded strings for font and image inclusion.
 Made to be compatible with node ^10.0.0, might work on higher versions, but currently not supported or tested.
 
 ## Installation
 
 ```
 npm i @squirrel-forge/build-scss
-
 ```
 
 ## cli usage
 
 If you installed globally with the *-g* option.
 ```
-build-scss target -b --boolean --str=loadBase64,...
-build-scss source target -b --boolean --str=loadBase64,...
-
+build-scss target -b --boolean --str=str,...
+build-scss source target -b --boolean --str=str,...
 ```
 
 For local installations use *npx* to run the build-scss executable.
@@ -35,30 +33,32 @@ the source argument is omitted and assumed to be the current working directory
 
 #### Using two arguments
 
-1. source - Path from where to read, if a directory, files are fetched with following options:
-            ```{ exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ }```
+1. source - Path from where to read, if a directory, sources are selected recursively with following options:
+            ```{ exclude : /\/_[^/]*\.(sass|scss)$/, extensions : /\.(sass|scss)/ }```
 2. target - Path to write rendered and processed css files
 
 ### Options
 
 A long option always override the value of a short option if both are used.
 
-| Short | Long           | Type            | Description                                                                                                                                |
-|-------|----------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| -p    | --production   | bool            | Set env to production and minify                                                                                                           |
-| -d    | --development  | bool            | Set env to development and generate map                                                                                                    |
-| -e    | --env          | str             | Set custom env name                                                                                                                        |
-| -c    | --compressed   | bool            | OutputStyle compressed                                                                                                                     |
-| -m    | --with-map     | bool            | Generate sourcemaps                                                                                                                        |
-|       | --no-postcss   | bool            | Disable postcss processing, the autoprefixer plugin won't run                                                                              |
-| -x    | --experimental | bool / str, ... | Enable experimental features, use without value or 'all' to enable all features, use comma separated list to enable specific features only |
-|       | --colors       | int, ...        | Define verbose listing color kib limits, must be 3 integers > 0, default: 102400,204800,307200                                             |
-| -s    | --stats        | bool            | Show stats output                                                                                                                          |
-| -i    | --verbose      | bool            | Show additional info, useful during development                                                                                            |
-| -u    | --loose        | bool            | Run in loose mode, disables the strict option and provides cleaner output when using @debug in your sass                                   |
-| -v    | --version      | bool            | Show the application version                                                                                                               |
+| Short | Long           | Type            | Description                                                                                                                                                 |
+|-------|----------------|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -p    | --production   | bool            | Set env to production, strict, compressed, postcss and stats                                                                                                |
+| -d    | --development  | bool            | Set env to development, loose, no-postcss, with-map, experimental and stats in verbose                                                                      |
+| -e    | --env          | str             | Set custom env name                                                                                                                                         |
+| -c    | --compressed   | bool            | OutputStyle compressed                                                                                                                                      |
+| -m    | --with-map     | bool            | Generate sourcemaps                                                                                                                                         |
+|       | --no-postcss   | bool            | Disable postcss processing, the autoprefixer plugin won't run                                                                                               |
+| -x    | --experimental | bool / str, ... | Enable experimental features and load plugins, use without value or 'all' to enable all features, use comma separated list to enable specific features only |
+| -o    | --options      | 'no',str        | Load options from this path, unless set to 'no', if not set regular checks apply                                                                            |
+|       | --defaults     | bool            | Deploy plugins config to cwd or target directory                                                                                                            |
+|       | --colors       | int,int,int     | Define verbose listing color kib limits, must be 3 integers > 0, default: 102400,204800,307200                                                              |
+| -s    | --stats        | bool            | Show stats output                                                                                                                                           |
+| -i    | --verbose      | bool            | Show additional info, useful during development                                                                                                             |
+| -u    | --loose        | bool            | Run in loose mode, disables the strict option and provides cleaner output when using @debug in your sass                                                    |
+| -v    | --version      | bool            | Show the application version                                                                                                                                |
 
-For development it's recommended to use following command options:
+For fun, it's recommended to use following command options:
 ```
 build-scss src dist -s -i -u -x
 ```
@@ -71,46 +71,56 @@ When installed locally use following scripts.
 ```
 ...
 "scripts": {
-    "sass:render": "build-scss src/scss dev/css -m",
-    "sass:publish": "build-scss src/scss dist/css -c -m",
+    "sass:render": "build-scss src/scss dev/css -d",
+    "sass:publish": "build-scss src/scss dist/css -p",
 }
 ...
 ```
 
-## Experimental features
+## Plugins and experimental features
 
-Following all experimental features, these features require the sass async render, which causes a significant performance decrease as of render time, the practical impact mostly depends on the amount of sass code rendered.
+Following all documented experimental features, the builtin shorthand names are only available when using the cli command.
 
 ```
 build-scss src/scss/ dist/css -x={all|feature},...
 ```
 
-### Load as base64 data url
+### Load files as base64 data url
 
-Feature reference: **loadBase64**
+Feature reference: **b64**
 
-Provides a sass function *load-base64($source,$mime:null)* that loads a file as data url, the mimetype is optional and will be detected at cost of performance if not set. The source argument is evaluated relative to the source root path, irrelevant from where the actual file is that contains the code, see following example:
+Provides a sass function *base64load($source,$mime)* that loads a file as data url, for more details check [@squirrel-forge/sass-base64-loader](https://www.npmjs.com/package/@squirrel-forge/sass-base64-loader).
 
-Sass code:
-```scss
-.icon {
-  &--a {
-    background-image: url(load-base64('icon.png'));
-  }
-  &--b {
-    background-image: url(load-base64('icon.jpg', 'image/jpeg'));
-  }
-}
-```
+### Importing a package
 
-Resulting css:
-```css
-.icon--a {
-    background-image: url("data:image/png;base64,...");
-}
-.icon--b {
-    background-image: url("data:image/jpeg;base64,...");
-}
+Feature reference: **pi**
+
+Provides a sass importer that will resolve package @import "~package" and @use "~package" statements, for more details check [@squirrel-forge/sass-package-importer](https://www.npmjs.com/package/@squirrel-forge/sass-package-importer).
+
+### Custom plugins
+
+You may load custom plugins with the *-x* or *--experimental* options, you may define plugins as *reference* or *name:reference*.
+Plugins are loaded with *require* and no further custom loading is used:
+
+ - Loading a plugin package: install the desired version of the package and use it's name as *reference*.
+ - Loading a local file path: use an absolute path or relative to process.cwd() as reference.
+
+#### Plugin structure
+
+Use the *name:reference* syntax and define the *name* in your plugin options config to customize your the options.
+
+```javascript
+/**
+ * Plugin factory sync
+ * @param {Object} options - Plugin options
+ * @param {Object} sassOptions - Sass options
+ * @param {ScssBuilder} builder - Builder instance
+ * @return {void}
+ */
+module.exports = function plugin( options, sassOptions, builder ) {
+    
+    // Set sass options, add sass plugins, extend postcss etc
+};
 ```
 
 ## Api usage
