@@ -4,7 +4,7 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
 const { cfx } = require( '@squirrel-forge/node-cfx' );
-const { CliInput, Progress, Timer, leadingZeros, StatsDisplay, convertBytes } = require( '@squirrel-forge/node-util' );
+const { CliInput, Progress, Timer, leadingZeros, StatsDisplay, convertBytes, FsInterface } = require( '@squirrel-forge/node-util' );
 const ScssBuilder = require( './classes/ScssBuilder' );
 
 /**
@@ -39,52 +39,117 @@ module.exports = async function cli() {
         // Show more output
         verbose : [ '-i', '--verbose', false, true ],
 
+        // Production mode
+        prod : [ '-p', '--production', false, true ],
+
+        // Development mode
+        dev : [ '-d', '--development', false, true ],
+
+        // Environment name
+        env : [ '-e', '--env', null, false ],
+
         // Minify the output
         minify : [ '-c', '--compressed', false, true ],
 
         // Generate sourcemaps
         map : [ '-m', '--with-map', false, true ],
 
+        // Set options source directory
+        options : [ '-o', '--options', true, false ],
+
         // A list of experimental features to use
         experimental : [ '-x', '--experimental', null, true, true ],
 
         // Do not run postcss
-        postcss : [ '-p', '--no-postcss', false, true ],
+        nopostcss : [ '-p', '--no-postcss', false, true ],
 
         // Color limits
-        colors : [ '-w', '--colors', '', false ],
+        colors : [ ' ', '--colors', '', false ],
+
+        // Deploy empty plugins default config to target
+        config : [ ' ', '--defaults', false, true ],
 
         // Do not break on any error, disables the default strict if set
         loose : [ '-u', '--loose', null, true ],
 
     } );
 
-    // Show version
-    if ( options.version ) {
-        const install_dir = path.resolve( __dirname, '../' );
-        let pkg;
-        try {
-            pkg = require( path.join( install_dir, 'package.json' ) );
-        } catch ( e ) {
-            cfx.error( e );
-            process.exit( 1 );
-        }
-        cfx.log( pkg.name + '@' + pkg.version );
-        cfx.info( '- Installed at: ' + install_dir );
-        process.exit( 0 );
+    // Cannot force dev and prod mode
+    if ( options.dev && options.prod ) {
+        cfx.error( 'Cannot force production and development mode at the same time' );
+        process.exit( 1 );
     }
 
     // Init application
     const scssB = new ScssBuilder( cfx );
 
-    // Set minify and sourcemap options
+    // Show version
+    if ( options.version ) {
+        cfx.log( scssB.pkg.name + '@' + scssB.pkg.version );
+        if ( options.verbose ) {
+            cfx.info( '- Installed at: ' + path.resolve( __dirname, '../' ) );
+        }
+        process.exit( 0 );
+    }
+
+    // Deploy default config
+    if ( options.config ) {
+        const config_data = require( './defaults.json' );
+        const resolved = path.resolve( target, scssB.pluginsOptionsName );
+        const config_exists = await FsInterface.exists( resolved );
+        if ( config_exists ) {
+            cfx.error( 'Config file already exists: ' + resolved );
+        } else {
+            const wrote = await FsInterface.write( resolved, JSON.stringify( config_data, null, 2 ) );
+            if ( wrote ) {
+                cfx.success( 'Created plugins defaults config: ' + resolved );
+            } else {
+                cfx.error( 'Failed to write config: ' + resolved );
+            }
+        }
+        process.exit( 0 );
+    }
+
+    // Development mode shortcut
+    if ( options.dev ) {
+        options.env = 'development';
+        options.loose = true;
+        options.nopostcss = true;
+        options.map = true;
+        options.experimental = options.experimental ? options.experimental : true;
+        options.stats = true;
+        options.verbose = true;
+    }
+
+    // Production mode shortcut
+    if ( options.prod ) {
+        options.env = 'production';
+        options.loose = false;
+        options.minify = true;
+        options.nopostcss = false;
+        options.stats = true;
+    }
+
+    // Disable default strict mode
     if ( options.loose ) {
         scssB.strict = false;
     }
+
+    // Enable verbose output
     scssB.verbose = options.verbose;
-    scssB.options.outputStyle = options.minify ? 'compressed' : 'expanded';
+
+    // Set env
+    scssB.env = options.env;
+
+    // Minify/compressed output
+    scssB.options.style = options.minify ? 'compressed' : 'expanded';
+
+    // Set sourcemaps
     scssB.options.sourceMap = options.map;
-    scssB.postprocess = options.postcss ? false : { map : options.map ? { inline : false } : false  };
+    scssB.postcss.options.map = options.map ? { inline : false } : false;
+
+    // Allow no postcss with option active
+    scssB.process = !options.nopostcss;
 
     // Color warning option must be an Array
     if ( !( options.colors instanceof Array ) ) {
@@ -107,29 +172,62 @@ module.exports = async function cli() {
     }
     const [ mark_green, mark_yellow, mark_red ] = options.colors;
 
-    // Experimental features
+    // Disable plugin options file
+    if ( input._f.includes( options.options ) ) {
+
+        // Load no options
+        scssB.pluginsOptionsPath = false;
+
+    } else if ( options.options && options.options.length ) {
+
+        // Set as options path
+        scssB.pluginsOptionsPath = options.options;
+    }
+
+    // Plugins and experimental features
     const xuse = [];
     if ( options.experimental ) {
+        const xshorthands = {
+            pi : '@squirrel-forge/sass-package-importer',
+            b64 : '@squirrel-forge/sass-base64-loader',
+        };
 
         // Enable all if set as boolean flag
         if ( options.experimental === true ) {
             options.experimental = 'all';
         }
-        const xavailable = [ 'loadBase64' ];
+
+        // Use all shorthand plugins
         if ( options.experimental === 'all' ) {
+            const xavailable = Object.values( xshorthands );
             xuse.push( ...xavailable );
         } else {
+
+            // Parse option value and add features/plugins to use list
             const parsed = options.experimental.split( ',' ).filter( ( v ) => { return !!v.length; } );
             if ( parsed.length ) {
-                xuse.push( ...parsed );
+                for ( let i = 0; i < parsed.length; i++ ) {
+
+                    // Add the defined full name for shorthand
+                    if ( xshorthands[ parsed[ i ] ] ) {
+                        xuse.push( xshorthands[ parsed[ i ] ] );
+                    } else {
+
+                        // Custom feature/plugin
+                        xuse.push( parsed[ i ] );
+                    }
+                }
             }
         }
+
+        // Always notify if using plugins
         if ( xuse.length ) {
-            cfx.warn( 'Using experimental features:' );
+            cfx.warn( 'Using plugins/experimental features' );
         }
+
+        // Notify plugins
         for ( let i = 0; i < xuse.length; i++ ) {
-            cfx.info( ' - ' + xuse[ i ] );
-            scssB.useExperimental( xuse[ i ] );
+            scssB.verbose && cfx.info( ' - ' + xuse[ i ] );
         }
     }
 
@@ -145,17 +243,17 @@ module.exports = async function cli() {
 
     /**
      * Get file stats data as array
-     * @param {Object} file - File object
+     * @param {Object|ScssBuildData} bdata - Build data object
      * @return {Array<string>} - Styled file stats parts
      */
-    const getFileStats = ( file ) => {
+    const getFileStats = ( bdata ) => {
         const output = [];
 
         // File from path
-        output.push( '- ' + stDi.show( [ file.source_rel, 'path' ], true ) );
+        output.push( '- ' + stDi.show( [ bdata.input.rel, 'path' ], true ) );
 
         // Full stats if written
-        if ( file.time.write ) {
+        if ( bdata.time.written ) {
 
             // Make extra stats output
             if ( options.stats ) {
@@ -163,15 +261,16 @@ module.exports = async function cli() {
                 // Begin bracket block
                 output.push( '[fred][[re]' );
 
-                if ( file.stats.rendered && file.stats.rendered.includedFiles ) {
+                // Show number of included files
+                if ( bdata.stats.rendered ) {
                     output.push( stDi.show( [ [
                         'Includes:',
-                        [ leadingZeros( file.stats.rendered.includedFiles.length, 3, ' ' ), 'number' ],
+                        [ leadingZeros( bdata.stats.rendered.length, 3, ' ' ), 'number' ],
                     ], 'asline' ], true ) );
                 }
 
                 // File size
-                const stat = fs.statSync( file.target.path );
+                const stat = fs.statSync( bdata.output.path );
                 if ( stat ) {
                     output.push( stDi.show( 'Output:', true ) );
 
@@ -189,7 +288,7 @@ module.exports = async function cli() {
 
                 // File total time
                 output.push( stDi.show( 'in', true ) );
-                output.push( leadingZeros( stDi.show( [ file.time.total, 'time' ], true ), 35, ' ' ) );
+                output.push( leadingZeros( stDi.show( [ bdata.time.total, 'time' ], true ), 35, ' ' ) );
 
                 // End bracket block
                 output.push( '[fred]]' );
@@ -198,10 +297,10 @@ module.exports = async function cli() {
             }
 
             // File to path
-            output.push( stDi.show( [ file.target_rel, 'path' ], true ) );
+            output.push( stDi.show( [ bdata.output.rel, 'path' ], true ) );
 
             // Output map
-            if ( file.map ) {
+            if ( bdata.map ) {
                 output.push( '[fred]([fcyan].map[fred])[re]' );
             }
         } else {
@@ -215,19 +314,19 @@ module.exports = async function cli() {
 
     /**
      * Fetch stats from file
-     * @param {Object} file - File object
-     * @param {Object} stats - Stats object
+     * @param {Object|ScssBuildData} bdata - Build data object
+     * @param {Object|ScssBuilderStats} stats - Stats object
      * @param {ScssBuilder} builder - Builder instance
      * @return {void}
      */
-    const statsFetcher = ( file, stats, builder ) => {
+    const statsFetcher = ( bdata, stats, builder ) => {
 
         // Stop the spinner, is updated with process count after output
         builder.strict && spinner.stop();
 
         // Generate informational output if requested
         if ( builder.verbose ) {
-            cfx.info( getFileStats( file ).join( ' ' ) );
+            cfx.info( getFileStats( bdata ).join( ' ' ) );
         }
 
         // Start the spinner with a count of the files processed
@@ -247,7 +346,7 @@ module.exports = async function cli() {
     try {
 
         // Run render, process and write
-        stats = await scssB.run( source, target, null, statsFetcher );
+        stats = await scssB.run( source, target, statsFetcher, xuse );
     } catch ( e ) {
         scssB.strict && spinner.stop();
 
@@ -306,20 +405,18 @@ module.exports = async function cli() {
             so.Overview.Files[ 0 ].push( 'Wrote:' );
             so.Overview.Files[ 0 ].push( stats.written );
         }
-        if ( stats.maps ) {
-            if ( stats.sources !== stats.maps ) {
-                so.Overview.Files[ 0 ].push( 'Maps:' );
-                so.Overview.Files[ 0 ].push( stats.maps );
-            } else {
-                so.Overview.Files[ 0 ].push( 'with map' + ( stats.maps === 1 ? '' : 's' ) );
-            }
+        if ( options.map && stats.written ) {
+            so.Overview.Files[ 0 ].push( 'with map' + ( stats.written === 1 ? '' : 's' ) );
+        }
+        if ( stats.options ) {
+            so.Overview[ 'Options loaded from' ] = [ stats.options, 'path' ];
         }
         if ( !options.verbose ) {
             const files_prop = 'Render and processing details';
             for ( let i = 0; i < stats.files.length; i++ ) {
-                const file = stats.files[ i ];
+                const bdata = stats.files[ i ];
                 if ( !so[ files_prop ] ) so[ files_prop ] = [];
-                so[ files_prop ].push( [ getFileStats( file ).join( ' ' ), 'none' ] );
+                so[ files_prop ].push( [ getFileStats( bdata ).join( ' ' ), 'none' ] );
             }
         }
 
