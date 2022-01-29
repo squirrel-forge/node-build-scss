@@ -3,10 +3,10 @@
  */
 const path = require( 'path' );
 const sass = require( 'sass' );
-const packageImporter = require( 'node-sass-package-importer' );
 const autoprefixer = require( 'autoprefixer' );
 const postcss = require( 'postcss' );
 const { Exception, FsInterface, isPojo, Timer } = require( '@squirrel-forge/node-util' );
+const ScssBuildData = require( './ScssBuildData' );
 
 /**
  * ScssBuilder exception
@@ -44,6 +44,14 @@ class ScssBuilder {
         this._cfx = cfx;
 
         /**
+         * Package
+         * @public
+         * @property
+         * @type {Object}
+         */
+        this.pkg = require( '../../package.json' );
+
+        /**
          * Strict mode
          * @public
          * @property
@@ -61,20 +69,12 @@ class ScssBuilder {
         this.verbose = true;
 
         /**
-         * Output file extension
+         * Environment name
          * @public
          * @property
-         * @type {string}
+         * @type {null|string}
          */
-        this.outputExt = '.css';
-
-        /**
-         * Output compressed file extension
-         * @public
-         * @property
-         * @type {string}
-         */
-        this.outputCompressedExt = '.min.css';
+        this.env = null;
 
         /**
          * Sass options
@@ -83,49 +83,71 @@ class ScssBuilder {
          * @type {Object}
          */
         this.options = {
-            outputStyle : 'compressed',
+            style : 'compressed',
             sourceMap : true,
-            importer : [ packageImporter() ],
+            importers : [],
             functions : {},
+            alertColor : true,
         };
 
         /**
-         * Use postcss
-         * @public
-         * @property
-         * @type {null|false|Object}
-         */
-        this.postprocess = { map : { inline : false } };
-
-        /**
-         * Post CSS processors
-         * @public
-         * @property
-         * @type {Array}
-         */
-        this.processors = [ autoprefixer ];
-
-        /**
-         * Run sass in async
+         * Run additional processing
          * @public
          * @property
          * @type {boolean}
          */
-        this.async = false;
+        this.process = true;
 
         /**
-         * Current/last run data
+         * Postcss processors and options
+         * @public
+         * @property
+         * @type {Object}
+         */
+        this.postcss = {
+            processors : [ autoprefixer ],
+            options : { map : { inline : false } }
+        };
+
+        /**
+         * Current run data
+         * @public
+         * @property
          * @type {null|Object}
          */
-        this.last = null;
+        this.current = null;
 
         /**
-         * Builtin experimental names used
+         * Plugin options
+         * @public
+         * @property
+         * @type {Object}
+         */
+        this.plugins = {};
+
+        /**
+         * Plugins options path
+         * @public
+         * @property
+         * @type {null|string}
+         */
+        this.pluginsOptionsPath = null;
+
+        /**
+         * Plugins options name
+         * @public
+         * @property
+         * @type {string}
+         */
+        this.pluginsOptionsName = '.build-scss';
+
+        /**
+         * Plugin names loaded
          * @protected
          * @property
-         * @type {string[]}
+         * @type {Array<string>}
          */
-        this._x = [];
+        this._loaded = [];
     }
 
     /**
@@ -177,125 +199,126 @@ class ScssBuilder {
     }
 
     /**
-     * Use experimental by name
-     * @public
-     * @param {string} name - Name or module to use
+     * Load plugins config
+     * @protected
+     * @param {Object} source - Source object
+     * @return {Promise<string|null>} - Loaded path or null on empty
+     */
+    async _loadPluginsConfig( source ) {
+        let data = null, from = null;
+
+        // Prioritize from options if available
+        if ( this.pluginsOptionsPath && this.pluginsOptionsPath.length ) {
+            const from_options = path.join( this.pluginsOptionsPath, this.pluginsOptionsName );
+            const options_exists = await FsInterface.exists( from_options );
+            if ( options_exists ) {
+                data = await FsInterface.readJSON( from_options );
+                from = from_options;
+            }
+        }
+
+        // Only attempt further loading if not disabled
+        if ( !data && this.pluginsOptionsPath !== false ) {
+
+            // Check current working directory
+            const from_cwd = path.join( process.cwd(), this.pluginsOptionsName );
+            const cwd_exists = await FsInterface.exists( from_cwd );
+            if ( cwd_exists ) {
+
+                // Config loaded from cwd
+                data = await FsInterface.readJSON( from_cwd );
+                from = from_cwd;
+            } else {
+
+                // Check source root directory
+                const from_source = path.join( source.root, this.pluginsOptionsName );
+                const source_exists = await FsInterface.exists( from_source );
+                if ( source_exists ) {
+
+                    // Config loaded form source root
+                    data = await FsInterface.readJSON( from_source );
+                    from = from_source;
+                }
+            }
+        }
+
+        // Assign config if one is loaded and not empty
+        if ( data && isPojo( data ) && Object.keys( data ).length ) {
+            Object.assign( this.plugins, data );
+        }
+
+        // Return origin
+        return from;
+    }
+
+    /**
+     * Use plugin by name
+     * @protected
+     * @param {string} name - Name, path or module to use
+     * @param {null|Object} options - Plugin options
+     * @param {null|Function} setter - Plugin setter
      * @return {void}
      */
-    useExperimental( name ) {
-        if ( this._x.includes( name ) ) {
-            throw new ScssBuilderException( 'Experimental feature already in use: ' + name );
+    _usePlugin( name, options = null, setter = null ) {
+        let load_path = name;
+
+        // Fetch separated name and load path
+        if ( name.indexOf( ':' ) > -1 ) {
+            const p = name.split( ':' ).filter( ( v ) => { return !!v.length; } );
+            if ( p.length < 2 ) {
+                throw new ScssBuilderException( 'Invalid plugin name:path definition: ' + name );
+            }
+            name = p.shift();
+            load_path = p.join( ':' );
         }
-        const builtins = [ 'loadBase64' ];
-        if ( builtins.includes( name ) ) {
-            name = '../sass-functions/' + name;
+
+        // Name already loaded
+        if ( this._loaded.includes( name ) ) {
+            throw new ScssBuilderException( 'Plugin already loaded: ' + name );
         }
-        let factory = null;
+
+        // Attempt to load plugin
+        let plugin = null;
         try {
-            factory = require( name );
+            plugin = require( load_path );
         } catch ( e ) {
-            throw new ScssBuilderException( 'Experimental factory not found: ' + name, e );
+            throw new ScssBuilderException( 'Plugin not found: ' + name, e );
         }
-        if ( typeof factory !== 'function' ) {
-            throw new ScssBuilderException( 'Experimental factory must be a function: ' + name );
+        if ( typeof plugin !== 'function' ) {
+            throw new ScssBuilderException( 'Plugin must be a function: ' + name );
         }
+
+        // Check local options or get options from plugins object
+        if ( !options && this.plugins[ name ] && this.plugins[ name ].options ) {
+            options = this.plugins[ name ].options;
+        }
+
+        // Run plugin
         try {
-            factory( sass, this );
+            plugin( options, this.options, this );
         } catch ( e ) {
             throw new ScssBuilderException( 'Failed to run experimental factory for: ' + name, e );
         }
-        this._x.push( name );
+
+        // Mark as loaded
+        this._loaded.push( name );
     }
 
     /**
-     * Register experimental sass function
-     * @public
-     * @param {string} sig - Signature
-     * @param {Function} fn - Function handler
-     * @return {void}
+     * @typedef {Object} ScssSourceObject
+     * @property {string} root - Root path
+     * @property {Array<string>} files - List of absolute source file paths
+     * @property {string} source - Original source string
+     * @property {string} resolved - Resolved source path
      */
-    registerExperimental( sig, fn ) {
-        if ( typeof sig !== 'string' ) {
-            throw new ScssBuilderException( 'Invalid function signature' );
-        }
-        if ( typeof fn !== 'function' ) {
-            throw new ScssBuilderException( 'Invalid experimental function' );
-        }
-        this.options.functions[ sig ] = fn;
-    }
-
-    /**
-     * Get sass options
-     * @protected
-     * @param {null|Object} options - Options object
-     * @return {Object} - Sass options
-     */
-    _getSassOptions( options = null ) {
-        if ( options === null ) {
-            options = this.options;
-        }
-        if ( !isPojo( options ) ) {
-            throw new ScssBuilderException( 'Invalid sass options object' );
-        }
-        return options;
-    }
-
-    /**
-     * Render async
-     * @protected
-     * @param {Object} options - Sass options
-     * @return {Promise<ScssBuilderException|Object>} - Sass render or exception
-     */
-    _renderAsync( options ) {
-        return new Promise( ( resolve ) => {
-            sass.render( options, ( err, result ) => {
-                resolve( err || result );
-            } );
-        } );
-    }
-
-    /**
-     * Render file
-     * @public
-     * @param {string} file - File path
-     * @param {Object} source - Source object
-     * @param {Object} target - Target object
-     * @param {null|Object} options - Sass options
-     * @return {Object} - File object
-     */
-    async renderFile( file, source, target, options = null ) {
-        options = this._getSassOptions( options );
-        const data = this._getFileData( file, source, target, options );
-
-        // Set input/output
-        options.file = file;
-        options.outFile = data.target.path;
-
-        // Render and return
-        this.timer.start( 'render-' + data.source.path );
-        let rendered;
-        if ( this.async ) {
-            rendered = await this._renderAsync( options );
-            if ( rendered instanceof Error ) {
-                throw rendered;
-            }
-        } else {
-            rendered = sass.renderSync( options );
-        }
-        data.time.rendered = this.timer.measure( 'render-' + data.source.path );
-        if ( rendered && rendered.stats ) {
-            data.stats.rendered = rendered.stats;
-        }
-        return { data, rendered };
-    }
 
     /**
      * Resolve source
-     * @protected
+     * @public
      * @param {string} source - Source path
-     * @return {Promise<{root: string, files: string[], source, resolved: string}>} - Source object
+     * @return {Promise<ScssSourceObject>} - Source object
      */
-    async _resolveSource( source ) {
+    async resolveSource( source ) {
 
         // Resolve source
         const resolved = path.resolve( source );
@@ -306,12 +329,12 @@ class ScssBuilder {
             throw new ScssBuilderException( 'Source not found: ' + resolved );
         }
 
-        // Convert to array for processing
+        // Convert to array for processing^
         let files = [ resolved ], root = resolved;
 
         // Fetch files if source is a directory
         if ( FsInterface.isDir( resolved ) ) {
-            files = FsInterface.fileList( resolved, { exclude : /\/_[^/]*\.scss$/, extensions : /\.scss/ } );
+            files = FsInterface.fileList( resolved, { exclude : /\/_[^/]*\.(sass|scss)$/, extensions : /\.(sass|scss)/ } );
 
             // Require file results
             if ( !files.length ) {
@@ -325,207 +348,335 @@ class ScssBuilder {
     }
 
     /**
-     * Resolve target
-     * @protected
-     * @param {string} target - Target source
-     * @return {Promise<{created: null, exists: boolean, target, resolved: string}>} - Target object
+     * @typedef {Object} ScssTargetObject
+     * @property {string} root - Root path (same as resolved)
+     * @property {string} target - Original target string
+     * @property {string} resolved - Resolved target path
+     * @property {boolean} created - True if the directory had to be created
      */
-    async _resolveTarget( target ) {
+
+    /**
+     * Resolve target
+     * @public
+     * @param {string} target - Target source
+     * @return {Promise<ScssTargetObject>} - Target object
+     */
+    async resolveTarget( target ) {
 
         // Resolve target
         const resolved = path.resolve( target );
 
         // Attempt create
-        let created = null, exists = await FsInterface.exists( resolved );
+        let created = false;
+        const exists = await FsInterface.exists( resolved );
         if ( !exists ) {
             created = await FsInterface.dir( resolved );
-            exists = true;
         }
 
         // Check for directory if not created
         if ( !created && !FsInterface.isDir( resolved ) ) {
             throw new ScssBuilderException( 'Target must be a directory: ' + resolved );
         }
-        return { target, resolved, exists, created };
+        const root = resolved;
+        return { root, target, resolved, created };
     }
 
     /**
-     * Get path data
-     * @protected
-     * @param {string} file - File path
-     * @param {null|string} ext - File extension change
-     * @return {{ext: string, name: string, dir: string}} - Path data
+     * Get sass options
+     * @param {null|Object} options - Sass options
+     * @throws ScssBuilderException
+     * @return {Object} - Sass options object
      */
-    _getPathData( file, ext = null ) {
-        const data = {
-            dir : path.dirname( file ),
-            name : path.basename( file, path.extname( file ) ),
-            ext : ext || path.extname( file ),
-        };
-        data.path = ext ? path.join( data.dir, data.name + data.ext ) : file;
-        return data;
-    }
-
-    /**
-     * Get file data
-     * @protected
-     * @param {string} file - File path
-     * @param {Object} source - Source object
-     * @param {Object} target - Target object
-     * @param {Object} options - Sass options
-     * @return {Object} - File data
-     */
-    _getFileData( file, source, target, options ) {
-        const rel = FsInterface.relative2root( file, source.root );
-        const target_path = path.join( target.resolved, rel );
-        let ext = this.outputExt;
-        if ( options.outputStyle === 'compressed' ) {
-            ext = this.outputCompressedExt;
-        }
-        return {
-            source_root : source.root,
-            target_root : target.resolved,
-            source : this._getPathData( file ),
-            target : this._getPathData( target_path, ext ),
-            source_rel : '.' + path.sep + rel,
-            target_rel : path.dirname( rel ) + path.sep
-                + path.basename( target_path, path.extname( target_path ) ) + ext,
-            map : null,
-            time : { total : null, rendered : null, processed : null, write : null },
-            stats : { rendered : null, processed : null },
-        };
-    }
-
-    /**
-     * Get postcss options
-     * @protected
-     * @param {null|Object} options - Options object
-     * @return {null|false|Object} - PostCSS options
-     */
-    _getProcessOptions( options ) {
+    getSassOptions( options ) {
         if ( options === null ) {
-            options = this.postprocess === true ? {} : this.postprocess;
+            options = this.options;
         }
         if ( !isPojo( options ) ) {
-            throw new ScssBuilderException( 'Invalid postcss options object' );
+            throw new ScssBuilderException( 'Invalid sass options object' );
+        }
+        options.verbose = this.verbose;
+        return options;
+    }
+
+    /**
+     * Get importer root template
+     * @param {string} env - Environment name
+     * @param {string} source - Import source path
+     * @param {string} prepend - Prepend sass string
+     * @return {string} - Sass importer template
+     */
+    sassRootTemplate( { env, source, prepend = '' } = {} ) {
+        if ( typeof env !== 'string' ) {
+            throw ScssBuilderException( 'Env must be a string' );
+        }
+        if ( typeof source !== 'string' || !source.length ) {
+            throw ScssBuilderException( 'Source must be a string and not empty' );
+        }
+        if ( typeof prepend !== 'string' ) {
+            throw ScssBuilderException( 'Prepend must be a string' );
+        }
+        const isProduction = env === 'production' ? 'true' : 'false';
+        return '/**\n'
+            + ` * ${this.pkg.name}@${this.pkg.version}\n`
+            + ' * Root render template\n'
+            + ` *  Set $env: ${env}\n`
+            + ` *  Set $production: ${isProduction}\n`
+            + ` *  Import: ${source};\n`
+            + ' */\n'
+            + `$env: ${env};\n`
+            + `$production: ${isProduction};\n`
+            + prepend + '\n'
+            + `@import "${source}";\n`;
+    }
+
+    /**
+     * Compile sass
+     * @param {Object|ScssBuildData} bdata - Build data object
+     * @param {null|Object} options - Sass options
+     * @throws ScssBuilderException
+     * @return {Promise<boolean>} - True on success
+     */
+    async renderBuildData( bdata, options = null ) {
+        options = this.getSassOptions( options );
+
+        // We require the primary import as load path, lets ensure it's the first
+        if ( options.loadPaths instanceof Array ) {
+            options.loadPaths.unshift( bdata.input.dir );
+        } else {
+            options.loadPaths = [ bdata.input.dir ];
+        }
+
+        // Prepare the root render template
+        const template = this.sassRootTemplate( {
+            env : this.env || 'null',
+            source : bdata.input.rel,
+            prepend : '',
+        } );
+
+        // Let sass do its magic
+        const result = await sass.compileStringAsync( template, options );
+
+        // Save data to build data
+        if ( result && result.css ) {
+            bdata.css = result.css;
+            bdata.map = result.sourceMap || null;
+            bdata.stats.rendered = result.loadedUrls;
+            return true;
+        }
+
+        // File generated was empty
+        if ( result && !result.css.length ) {
+            throw new ScssBuilderException( 'Source file generated no output' );
+        }
+
+        // There is a bug if this happens
+        throw new ScssBuilderException( 'Unknown error while rendering build data' );
+    }
+
+    /**
+     * Get process options
+     * @param {null|Object} options - Process options
+     * @throws ScssBuilderException
+     * @return {Object} - Process options object
+     */
+    getProcessOptions( options ) {
+        if ( options === null ) {
+            options = this.postcss.options;
+        }
+        if ( !isPojo( options ) ) {
+            throw new ScssBuilderException( 'Invalid process options object' );
         }
         return options;
     }
 
     /**
-     * Process file with postcss
-     * @param {Object} file - File object
-     * @param {Object} options - PostCSS options
-     * @return {Promise<void>} - Returns no value, modifies the file object
+     * Process build data input
+     * @param {Object|ScssBuildData} bdata - Build data object
+     * @param {null|Object} options - Process options
+     * @throws ScssBuilderException
+     * @return {Promise<boolean>} - True on success
      */
-    async processFile( file, options = null ) {
-        options = this._getProcessOptions( options );
-        options.from = file.data.source.path;
-        options.to = file.data.target.path;
-        this.timer.start( 'process-' + file.data.source.path );
-        file.processed = await postcss( this.processors ).process( file.rendered.css, options );
-        file.data.time.processed = this.timer.measure( 'process-' + file.data.source.path );
-        file.data.stats.processed = file.processed.messages;
+    async processBuildData( bdata, options = null ) {
+        options = this.getProcessOptions( options );
+
+        // We require the real input and output paths and let pass on the map from sass
+        options.from = bdata.input.path;
+        options.to = bdata.output.path;
+        if ( bdata.map ) options.map.prev = bdata.map;
+
+        // Let postcss do it's thing
+        const result = await postcss( this.postcss.processors ).process( bdata.css, options );
+
+        // Save data to build data
+        if ( result && result.css ) {
+            bdata.css = result.css;
+            bdata.map = result.map;
+            bdata.stats.processed = result.messages;
+            return true;
+        }
+
+        // There is a bug if this happens
+        throw new ScssBuilderException( 'Unknown error while rendering build data' );
     }
+
+    /**
+     * Write build data output
+     * @param {Object|ScssBuildData} bdata - Build data object
+     * @throws ScssBuilderException
+     * @return {Promise<boolean>} - True on success
+     */
+    async writeBuildData( bdata ) {
+
+        // Write css file
+        const wrote_css = await FsInterface.write( bdata.output.path, bdata.css );
+        if ( !wrote_css ) {
+            throw new ScssBuilderException( 'Failed to write: ' + bdata.output.path );
+        }
+
+        // Write map file
+        let wrote_map = true;
+        if ( bdata.map ) {
+            wrote_map = await FsInterface.write( bdata.output.path + '.map', bdata.map );
+            if ( !wrote_map ) {
+                throw new ScssBuilderException( 'Failed to write: ' + bdata.output.path + '.map' );
+            }
+        }
+
+        // Wrote css and map if available
+        if ( wrote_css === true && wrote_map === true ) {
+            return true;
+        }
+
+        // There is a bug if this happens
+        throw new ScssBuilderException( 'Unknown error while writing build data' );
+    }
+
+    /**
+     * @typedef {Object} ScssBuilderStats
+     * @property {number} sources - Number of source files
+     * @property {number} rendered - Number of rendered files
+     * @property {number} processed - NUmber of processed files,
+     * @property {number} written - Number of written files,
+     * @property {Array<ScssBuildData>} files - Array of build data objects
+     * @property {Array<number, number>} time - Total time, in hrtime format
+     */
 
     /**
      * Run build
      * @param {string} source - Source path
      * @param {string} target - Target path
-     * @param {null|function} allowrite - Before write callback
      * @param {null|function} complete - Complete callback
-     * @return {Promise<{processed: number, sources: number, rendered: number, maps: number, written: number}>} - Stats
+     * @param {null|Array<string>} plugins - Plugin names or references to load
+     * @return {Promise<ScssBuilderStats>} - Stats
      */
-    async run( source, target, allowrite = null, complete = null ) {
+    async run( source, target, complete = null, plugins = null ) {
         this.timer.start( 'total-run' );
-        source = await this._resolveSource( source );
-        target = await this._resolveTarget( target );
-        this.last = { source, target };
+        source = await this.resolveSource( source );
+        target = await this.resolveTarget( target );
+        this.current = { source, target };
 
+        /**
+         * Global stats
+         * @type {ScssBuilderStats}
+         */
         const stats = {
             sources : source.files.length,
             rendered : 0,
             processed : 0,
             written : 0,
-            maps : 0,
             files : [],
             time : null,
-            dirs : {
-                created : [],
-                failed : [],
-            },
         };
 
-        for ( let i = 0; i < source.files.length; i++ ) {
-            const fp = source.files[ i ];
-            this.timer.start( 'total-' + fp );
-            let file = null;
-            try {
-                file = await this.renderFile( fp, source, target );
-                if ( file ) {
-                    stats.rendered++;
-                }
-            } catch ( e ) {
-                this.error( new ScssBuilderException( 'Render failed for: ' + fp, e ) );
-            }
-            if ( !file ) continue;
-            stats.files.push( file.data );
+        // Load plugin options file if available
+        try {
+            stats.options = await this._loadPluginsConfig( source );
+        } catch ( err ) {
+            this.error( new ScssBuilderException( 'Failed to load plugins options config', err ) );
+        }
 
-            if ( this.postprocess ) {
+        // Load plugins if requested
+        if ( plugins && plugins instanceof Array ) {
+            for ( let i = 0; i < plugins.length; i++ ) {
                 try {
-                    await this.processFile( file );
-                    if ( file.processed ) {
-                        stats.processed++;
-                    }
-                } catch ( e ) {
-                    this.error( new ScssBuilderException( 'PostCSS failed for: ' + fp, e ) );
+                    this._usePlugin( plugins[ i ] );
+                } catch ( err ) {
+                    this.error( err );
                 }
-            }
-
-            let write = true;
-            if ( typeof allowrite === 'function' ) {
-                write = await allowrite( file, stats, this );
-            }
-            if ( !write ) continue;
-
-            this.timer.start( 'write-' + fp );
-            let css = file.rendered.css.toString(), map = null;
-            if ( this.postprocess && file.processed ) {
-                css = file.processed.css.toString();
-                if ( file.processed.map ) {
-                    map = file.processed.map.toString();
-                }
-            } else if ( file.rendered.map ) {
-                map = file.rendered.map.toString();
-            }
-            const wrote_css = await FsInterface.write( file.data.target.path, css );
-            if ( !wrote_css ) {
-                this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path ) );
-            } else {
-                stats.written++;
-            }
-            if ( map ) {
-                const wrote_map = await FsInterface.write( file.data.target.path + '.map', map );
-                if ( !wrote_map ) {
-                    this.error( new ScssBuilderException( 'Failed to write: ' + file.data.target.path + '.map' ) );
-                } else {
-                    file.data.map = file.data.target.path + '.map';
-                    stats.maps++;
-                }
-            }
-            file.data.time.write = this.timer.measure( 'write-' + fp );
-            file.data.time.total = this.timer.measure( 'total-' + fp );
-
-            if ( typeof complete === 'function' ) {
-                await complete( file.data, stats, this );
             }
         }
-        stats.time = this.timer.measure( 'total-run' );
 
+        // Cycle all source files
+        for ( let i = 0; i < source.files.length; i++ ) {
+            const file = source.files[ i ];
+
+            // Start stats timer and create build data
+            this.timer.start( 'total-' + file );
+            const bdata = new ScssBuildData( file, source, target, {
+                append : this.getSassOptions( null ).style === 'compressed' ? '.min' : ''
+            } );
+            stats.files.push( bdata );
+
+            // Attempt to render build data or skip along on error
+            this.timer.start( 'render-' + file );
+            try {
+                const rendered = await this.renderBuildData( bdata );
+                if ( rendered ) stats.rendered++;
+            } catch ( err ) {
+                bdata.errors = err;
+                this.error( new ScssBuilderException( 'Render failed for: ' + file, err ) );
+                continue;
+            }
+            bdata.time.rendered = this.timer.measure( 'render-' + file );
+
+            // Run postcss with the current build data if required
+            if ( this.process ) {
+                this.timer.start( 'process-' + file );
+                try {
+                    const processed = await this.processBuildData( bdata );
+                    if ( processed ) stats.processed++;
+                } catch ( err ) {
+                    bdata.errors = err;
+                    this.error( new ScssBuilderException( 'Process failed for: ' + file, err ) );
+                    continue;
+                }
+                bdata.time.processed = this.timer.measure( 'process-' + file );
+            }
+
+            // Attempt to write build data or skip along
+            this.timer.start( 'write-' + file );
+            try {
+                const written = await this.writeBuildData( bdata );
+                if ( written ) stats.written++;
+            } catch ( err ) {
+                bdata.errors = err;
+                this.error( new ScssBuilderException( 'Write failed for: ' + file, err ) );
+                continue;
+            }
+            bdata.time.written = this.timer.measure( 'write-' + file );
+
+            // Record file total time
+            bdata.time.total = this.timer.measure( 'total-' + file );
+
+            // Call complete for the current file
+            if ( typeof complete === 'function' ) {
+                await complete( bdata, stats, this );
+            }
+
+            // Clear any memory of data that is not needed anymore
+            bdata.clearMemory();
+        }
+
+        // Reset current
+        this.current = null;
+
+        // Record total time and return
+        stats.time = this.timer.measure( 'total-run' );
         return stats;
     }
 }
 
-// Export Exception as static property constructor
+// Export Exception and related classes as static property constructor
 ScssBuilder.ScssBuilderException = ScssBuilderException;
+ScssBuilder.ScssBuildData = ScssBuildData;
 module.exports = ScssBuilder;
