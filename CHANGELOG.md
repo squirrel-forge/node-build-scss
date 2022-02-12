@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+ - Update dependencies.
+ - Note: *sass* package now requires *node >= 12.0.0*, but is still functional on *node@10.x.x* when using npm, if you are using yarn you must run the builder with *node@12.x.x* as it enforces the node version.
+
 ## 0.8.0
  - Migrated to the new node api, including internal refactoring, which only affects the internal js api and makes it more verbose and easier to use.
  - Updated all dependencies including plugins, plugin peer dependencies must be installed manually.

@@ -1,6 +1,6 @@
 {
   "name": "@squirrel-forge/build-scss",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Simple sass/scss wrapper including some useful configuration options.",
   "main": "src/classes/ScssBuilder.js",
   "scripts": {
@@ -34,17 +34,17 @@
     "node": ">= 10.0.0"
   },
   "peerDependencies": {
-    "@squirrel-forge/sass-base64-loader": "^0.11.0",
-    "@squirrel-forge/sass-package-importer": "^0.11.1"
+    "@squirrel-forge/sass-base64-loader": "^0.11.2",
+    "@squirrel-forge/sass-package-importer": "^0.11.2"
   },
   "dependencies": {
     "@squirrel-forge/node-cfx": "^1.2.1",
     "@squirrel-forge/node-util": "^1.4.2",
     "autoprefixer": "^10.4.2",
     "cli-spinner": "^0.2.10",
-    "directory-tree": "^3.0.1",
+    "directory-tree": "^3.2.1",
     "intercept-stdout": "^0.1.2",
     "postcss": "^8.4.5",
-    "sass": "^1.49.0"
+    "sass": "^1.49.7"
   }
 }
