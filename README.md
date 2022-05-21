@@ -1,6 +1,6 @@
 # @squirrel-forge/build-scss
 Simple sass wrapper including some useful configuration options and extended features like package support and loading files as base64 encoded strings for font and image inclusion.
-Made to be compatible with node ^10.0.0, might work on higher versions, but currently not supported or tested.
+Made to be compatible with node ^10.0.0, might work on higher versions, only partially tested.
 
 ## Installation
 
