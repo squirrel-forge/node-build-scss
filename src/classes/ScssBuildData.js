@@ -105,6 +105,20 @@ module.exports = class ScssBuildData {
         };
         data.path = ext ? path.join( data.dir, data.name + data.ext ) : file;
         data.rel = '.' + path.sep + FsInterface.relative2root( data.path, root );
+        const entries = Object.entries( data );
+        for ( let i = 0; i < entries.length; i++ ) {
+            const [ k, v ] = entries[ i ];
+            data[ k ] = ScssBuildData.safePath( v );
+        }
         return data;
+    }
+
+    /**
+     * Get safe path
+     * @param {string} ref - Path to make safe
+     * @return {string} - Safe path
+     */
+    static safePath( ref ) {
+        return ref.replace( /\\/g, '/' );
     }
 };
