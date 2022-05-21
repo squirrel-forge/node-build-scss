@@ -334,7 +334,7 @@ class ScssBuilder {
 
         // Fetch files if source is a directory
         if ( FsInterface.isDir( resolved ) ) {
-            files = FsInterface.fileList( resolved, { exclude : /\/_[^/]*\.(sass|scss)$/, extensions : /\.(sass|scss)/ } );
+            files = FsInterface.fileList( resolved, { exclude : /[\/\\]_[^(\/|\\)]*\.(sass|scss)$/, extensions : /^\.(sass|scss)$/ } );
 
             // Require file results
             if ( !files.length ) {
@@ -344,7 +344,14 @@ class ScssBuilder {
             root = path.dirname( resolved );
         }
 
-        return { root, source, resolved, files };
+        return {
+            root : ScssBuildData.safePath( root ),
+            source : ScssBuildData.safePath( source ),
+            resolved : ScssBuildData.safePath( resolved ),
+            files : files.map( ( v ) => {
+                return ScssBuildData.safePath( v );
+            } ),
+        };
     }
 
     /**
