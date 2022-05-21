@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+ - Fixed source path matching for windows backslash paths.
+ - Convert all *ScssBuildData* paths with *safePath* method. 
+ - Added *ScssBuildData.safePath()* method for ensuring forward slash paths.
+
 ## 0.8.1
  - Update dependencies.
  - Note: *sass* package now requires *node >= 12.0.0*, but is still functional on *node@10.x.x* when using npm, if you are using yarn you must run the builder with *node@12.x.x* as it enforces the node version.
