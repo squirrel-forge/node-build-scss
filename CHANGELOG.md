@@ -4,6 +4,7 @@
  - Fixed source path matching for windows backslash paths.
  - Convert all *ScssBuildData* paths with *safePath* method. 
  - Added *ScssBuildData.safePath()* method for ensuring forward slash paths.
+ - Notes on the windows path issues: https://github.com/sass/dart-sass/issues/669
 
 ## 0.8.1
  - Update dependencies.
