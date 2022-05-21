@@ -104,7 +104,8 @@ module.exports = class ScssBuildData {
             ext : ext || path.extname( file ),
         };
         data.path = ext ? path.join( data.dir, data.name + data.ext ) : file;
-        data.rel = '.' + path.sep + FsInterface.relative2root( data.path, root );
+        data.rel = '.' + path.sep + FsInterface.relative2root( data.path, root )
+            .replace( /^\/+/g, '' );
         const entries = Object.entries( data );
         for ( let i = 0; i < entries.length; i++ ) {
             const [ k, v ] = entries[ i ];
