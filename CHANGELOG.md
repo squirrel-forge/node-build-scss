@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.3
+ - Fixed *ScssBuildData* relative path.
+
 ## 0.8.2
  - Fixed source path matching for windows backslash paths.
  - Convert all *ScssBuildData* paths with *safePath* method. 
