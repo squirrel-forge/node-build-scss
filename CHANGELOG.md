@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.4
+ - Dirty fix for [ReferenceError: globalThis is not defined](https://github.com/jsdom/jsdom/issues/2795) on Node 10, caused by version [sass >=1.60.0](https://www.npmjs.com/package/sass/v/1.60.0).
+ - Added default .browserslistrc to deploy with default options config.
+
 ## 0.8.3
  - Fixed *ScssBuildData* relative path.
 
