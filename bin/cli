@@ -1,3 +1,4 @@
 #!/usr/bin/env node
 'use strict';
+if ( typeof globalThis === 'undefined' ) global.globalThis = global;
 require( '../src/cli' )();
