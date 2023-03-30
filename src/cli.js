@@ -107,6 +107,19 @@ module.exports = async function cli() {
                 cfx.error( 'Failed to write config: ' + resolved );
             }
         }
+        const b_source = path.resolve( __dirname, 'browserslistrc' );
+        const b_resolved = path.resolve( target, '.browserslistrc' );
+        const b_config_exists = await FsInterface.exists( b_resolved );
+        if ( b_config_exists ) {
+            cfx.error( 'Config file already exists: ' + b_resolved );
+        } else {
+            const wrote = await FsInterface.copy( b_source, b_resolved );
+            if ( wrote ) {
+                cfx.success( 'Created default browserslistrc: ' + b_resolved );
+            } else {
+                cfx.error( 'Failed to write config: ' + resolved );
+            }
+        }
         process.exit( 0 );
     }
 
